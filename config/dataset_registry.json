@@ -1,0 +1,255 @@
+{
+  "version": 1,
+  "root_collections": {
+    "external_dataset_root": "/Users/basudev/Documents/dataset"
+  },
+  "datasets": [
+    {
+      "id": "diamonds_prices_2022",
+      "name": "Diamonds Prices 2022",
+      "path": "/Users/basudev/Documents/dataset/regression/Diamonds Prices2022.csv",
+      "group": "regression",
+      "role": "core_benchmark",
+      "task_type": "regression",
+      "default_target": "price",
+      "drop_columns": [
+        "Unnamed: 0"
+      ],
+      "notes": [
+        "Strong mixed numeric and categorical regression benchmark.",
+        "Good default dataset for testing general tabular regression."
+      ]
+    },
+    {
+      "id": "energy_efficiency_heating",
+      "name": "Energy Efficiency Heating Load",
+      "path": "/Users/basudev/Documents/dataset/regression/energy_efficiency_data.csv",
+      "group": "regression",
+      "role": "core_benchmark",
+      "task_type": "regression",
+      "default_target": "Heating_Load",
+      "drop_columns": [],
+      "notes": [
+        "Numeric-heavy structured regression dataset.",
+        "Use Heating_Load as the default target."
+      ]
+    },
+    {
+      "id": "energy_efficiency_cooling",
+      "name": "Energy Efficiency Cooling Load",
+      "path": "/Users/basudev/Documents/dataset/regression/energy_efficiency_data.csv",
+      "group": "regression",
+      "role": "core_benchmark",
+      "task_type": "regression",
+      "default_target": "Cooling_Load",
+      "drop_columns": [],
+      "notes": [
+        "Second valid target from the same dataset.",
+        "Useful for validating multi-target datasets one target at a time."
+      ]
+    },
+    {
+      "id": "house_price_india",
+      "name": "House Price India",
+      "path": "/Users/basudev/Documents/dataset/regression/House Price India.csv",
+      "group": "regression",
+      "role": "core_benchmark",
+      "task_type": "regression",
+      "default_target": "Price",
+      "drop_columns": [
+        "id"
+      ],
+      "notes": [
+        "Larger housing regression dataset.",
+        "ID should usually be dropped before training."
+      ]
+    },
+    {
+      "id": "insurance_charges",
+      "name": "Insurance Charges",
+      "path": "/Users/basudev/Documents/dataset/regression/insurance.csv",
+      "group": "regression",
+      "role": "core_benchmark",
+      "task_type": "regression",
+      "default_target": "charges",
+      "drop_columns": [],
+      "notes": [
+        "Clean mixed-feature regression dataset.",
+        "Good fast benchmark for the AutoML app."
+      ]
+    },
+    {
+      "id": "adult_income",
+      "name": "Adult Income",
+      "path": "/Users/basudev/Documents/dataset/classification/adult.csv",
+      "group": "classification",
+      "role": "core_benchmark",
+      "task_type": "classification",
+      "default_target": "income",
+      "drop_columns": [],
+      "notes": [
+        "Excellent general-purpose mixed-feature classification benchmark."
+      ]
+    },
+    {
+      "id": "breast_cancer_diagnosis",
+      "name": "Breast Cancer Diagnosis",
+      "path": "/Users/basudev/Documents/dataset/classification/breast cancer.csv",
+      "group": "classification",
+      "role": "core_benchmark",
+      "task_type": "classification",
+      "default_target": "diagnosis",
+      "drop_columns": [
+        "id",
+        "Unnamed: 32"
+      ],
+      "notes": [
+        "Strong numeric binary classification benchmark.",
+        "Drop the identifier and trailing empty column."
+      ]
+    },
+    {
+      "id": "iris_species",
+      "name": "Iris Species",
+      "path": "/Users/basudev/Documents/dataset/classification/Iris.csv",
+      "group": "classification",
+      "role": "core_benchmark",
+      "task_type": "classification",
+      "default_target": "Species",
+      "drop_columns": [
+        "Id"
+      ],
+      "notes": [
+        "Small multiclass sanity-check dataset.",
+        "Useful for quick smoke tests."
+      ]
+    },
+    {
+      "id": "synthetic_credit_risk_balanced",
+      "name": "Synthetic Credit Risk",
+      "path": "/Users/basudev/Documents/dataset/classification/synthetic_credit_risk.csv",
+      "group": "classification",
+      "role": "core_benchmark",
+      "task_type": "classification",
+      "default_target": "target",
+      "drop_columns": [],
+      "notes": [
+        "Structured mixed-feature classification dataset.",
+        "Good default benchmark for business-style classification."
+      ]
+    },
+    {
+      "id": "uci_credit_default",
+      "name": "UCI Credit Card Default",
+      "path": "/Users/basudev/Documents/dataset/classification/UCI_Credit_Card.csv",
+      "group": "classification",
+      "role": "core_benchmark",
+      "task_type": "classification",
+      "default_target": "default.payment.next.month",
+      "drop_columns": [
+        "ID"
+      ],
+      "notes": [
+        "Strong real-world credit-default classification benchmark.",
+        "Drop ID before training."
+      ]
+    },
+    {
+      "id": "telco_customer_churn",
+      "name": "Telco Customer Churn",
+      "path": "/Users/basudev/Documents/dataset/classification/WA_Fn-UseC_-Telco-Customer-Churn.csv",
+      "group": "classification",
+      "role": "core_benchmark",
+      "task_type": "classification",
+      "default_target": "Churn",
+      "drop_columns": [
+        "customerID"
+      ],
+      "drop_or_convert_columns": {
+        "TotalCharges": "convert_to_numeric"
+      },
+      "notes": [
+        "Excellent mixed-feature churn dataset.",
+        "Customer ID should be dropped and TotalCharges should be coerced to numeric."
+      ]
+    },
+    {
+      "id": "synthetic_credit_risk_imbalanced",
+      "name": "Synthetic Credit Risk Imbalanced",
+      "path": "/Users/basudev/Documents/dataset/imbalanced classification dataset/synthetic_credit_risk (1).csv",
+      "group": "imbalanced_classification",
+      "role": "core_benchmark",
+      "task_type": "classification",
+      "default_target": "target",
+      "drop_columns": [],
+      "notes": [
+        "Imbalanced binary classification dataset.",
+        "Minority class is about 7.7 percent."
+      ]
+    },
+    {
+      "id": "titanic_stress_dataset",
+      "name": "Titanic Stress Dataset",
+      "path": "/Users/basudev/Documents/dataset/classification/train_and_test2.csv",
+      "group": "classification",
+      "role": "stress_test",
+      "task_type": "classification",
+      "default_target": "2urvived",
+      "drop_columns": [
+        "zero",
+        "zero.1",
+        "zero.2",
+        "zero.3",
+        "zero.4",
+        "zero.5",
+        "zero.6",
+        "zero.7",
+        "zero.8",
+        "zero.9",
+        "zero.10",
+        "zero.11",
+        "zero.12",
+        "zero.13",
+        "zero.14",
+        "zero.15",
+        "zero.16",
+        "zero.17",
+        "zero.18"
+      ],
+      "notes": [
+        "Messy Titanic-style dataset.",
+        "Keep as a robustness test, not a default benchmark."
+      ]
+    },
+    {
+      "id": "aug_test_categorical_stress",
+      "name": "Categorical Heavy Stress Dataset",
+      "path": "/Users/basudev/Documents/dataset/dataset with many categorical columns/aug_test.csv",
+      "group": "categorical_heavy",
+      "role": "stress_test",
+      "task_type": "unspecified",
+      "default_target": null,
+      "drop_columns": [
+        "enrollee_id"
+      ],
+      "notes": [
+        "Many categorical columns and high-cardinality city field.",
+        "No target column present, so not training-ready by itself."
+      ]
+    },
+    {
+      "id": "covid_us_county_numeric_stress",
+      "name": "COVID US County Numeric Stress Dataset",
+      "path": "/Users/basudev/Documents/dataset/numeric columns/covid_us_county.csv",
+      "group": "numeric_heavy",
+      "role": "stress_test",
+      "task_type": "special_case",
+      "default_target": null,
+      "drop_columns": [],
+      "notes": [
+        "Very large numeric-heavy time-series-like dataset.",
+        "Useful as a preprocessing stress test, not a default AutoML benchmark."
+      ]
+    }
+  ]
+}
