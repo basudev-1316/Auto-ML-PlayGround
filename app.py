@@ -30,7 +30,10 @@ def load_dataset_registry() -> dict[str, object]:
 
 @st.cache_data
 def load_registered_dataset(dataset_path: str) -> pd.DataFrame:
-    return pd.read_csv(dataset_path)
+    resolved_path = Path(dataset_path)
+    if not resolved_path.is_absolute():
+        resolved_path = PROJECT_ROOT / resolved_path
+    return pd.read_csv(resolved_path)
 
 
 @st.cache_resource
@@ -647,6 +650,13 @@ def prepare_registered_dataset(dataset_entry: dict[str, object]) -> pd.DataFrame
     return dataset
 
 
+def registry_dataset_exists(dataset_entry: dict[str, object]) -> bool:
+    dataset_path = Path(str(dataset_entry["path"]))
+    if not dataset_path.is_absolute():
+        dataset_path = PROJECT_ROOT / dataset_path
+    return dataset_path.exists()
+
+
 def inject_custom_styles() -> None:
     st.markdown(
         """
@@ -876,8 +886,11 @@ def main() -> None:
 
     dataset_registry = load_dataset_registry()
     registry_entries = dataset_registry.get("datasets", [])
+    available_registry_entries = [entry for entry in registry_entries if registry_dataset_exists(entry)]
     registry_lookup = {entry["name"]: entry for entry in registry_entries}
+    available_registry_lookup = {entry["name"]: entry for entry in available_registry_entries}
     registry_dataset_names = sorted(registry_lookup.keys())
+    available_registry_names = sorted(available_registry_lookup.keys())
 
     st.markdown(
         """
@@ -891,15 +904,20 @@ def main() -> None:
 
     control_left, control_right = st.columns([1.2, 1])
     with control_left:
-        dataset_source = st.radio("Dataset source", options=["Registry dataset", "Upload CSV"], index=0, horizontal=True)
+        default_source_index = 0 if available_registry_names else 1
+        dataset_source = st.radio("Dataset source", options=["Registry dataset", "Upload CSV"], index=default_source_index, horizontal=True)
     with control_right:
         uploaded_dataset = None
         selected_registry_name = None
         selected_registry_entry = None
 
     if dataset_source == "Registry dataset":
-        selected_registry_name = st.selectbox("Choose dataset", options=registry_dataset_names)
-        selected_registry_entry = registry_lookup[selected_registry_name]
+        if not available_registry_names:
+            st.info("Registry datasets are not bundled in this deployment. Please use Upload CSV.")
+            dataset_source = "Upload CSV"
+        else:
+            selected_registry_name = st.selectbox("Choose dataset", options=available_registry_names)
+            selected_registry_entry = available_registry_lookup[selected_registry_name]
     else:
         uploaded_dataset = st.file_uploader("Upload training dataset", type=["csv"])
 
