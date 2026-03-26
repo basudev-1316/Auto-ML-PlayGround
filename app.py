@@ -37,7 +37,13 @@ def load_registered_dataset(dataset_path: str) -> pd.DataFrame:
 def load_model():
     if not MODEL_PATH.exists():
         return None
-    return joblib.load(MODEL_PATH)
+    try:
+        return joblib.load(MODEL_PATH)
+    except Exception as exc:
+        return {
+            "load_error": str(exc),
+            "model_path": str(MODEL_PATH),
+        }
 
 
 def train_model(df: pd.DataFrame, target_column: str, progress_callback=None) -> tuple[pd.DataFrame, dict[str, object]]:
@@ -806,7 +812,12 @@ def get_model_schema_status(
         "schema_matches": False,
         "missing_columns": [],
         "extra_columns": [],
+        "load_error": None,
     }
+
+    if isinstance(model_bundle, dict) and "load_error" in model_bundle:
+        status["load_error"] = model_bundle["load_error"]
+        return status
 
     if not isinstance(model_bundle, dict) or "model" not in model_bundle:
         status["trained_model"] = model_bundle
@@ -928,6 +939,14 @@ def main() -> None:
     if isinstance(model_bundle, dict):
         saved_signature = model_bundle.get("dataset_signature")
     dataset_is_trained = saved_signature == active_signature and schema_status["schema_matches"]
+
+    if schema_status.get("load_error"):
+        st.warning(
+            "The saved model could not be loaded in this environment. "
+            "Retrain the dataset to create a fresh compatible model."
+        )
+        with st.expander("Saved model load error", expanded=False):
+            st.code(str(schema_status["load_error"]))
 
     render_eda_section(dataset, selected_target)
 
