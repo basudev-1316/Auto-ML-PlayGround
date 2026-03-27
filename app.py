@@ -49,8 +49,21 @@ def load_model():
         }
 
 
-def train_model(df: pd.DataFrame, target_column: str, progress_callback=None) -> tuple[pd.DataFrame, dict[str, object]]:
-    automl = AutoMLPipeline(df, target=target_column, model_path=MODEL_PATH, progress_callback=progress_callback)
+def train_model(
+    df: pd.DataFrame,
+    target_column: str,
+    task_type_override: str | None = None,
+    training_mode: str = "Balanced",
+    progress_callback=None,
+) -> tuple[pd.DataFrame, dict[str, object]]:
+    automl = AutoMLPipeline(
+        df,
+        target=target_column,
+        model_path=MODEL_PATH,
+        task_type_override=task_type_override,
+        training_mode=training_mode,
+        progress_callback=progress_callback,
+    )
     results = automl.run()
     load_model.clear()
     evaluation_artifacts = {
@@ -76,9 +89,7 @@ def render_training_progress(payload: dict[str, object], status_box, progress_ba
 
     phase_labels = {
         "profiling": "Profiling Dataset",
-        "shortlist": "Stage 1: Shortlist",
-        "champion": "Stage 2: Champion Round",
-        "tuning": "Stage 3: Hyperparameter Tuning",
+        "shortlist": "Model Benchmarking",
         "finalizing": "Finalizing Winner",
         "saving": "Saving Model",
         "done": "Completed",
@@ -88,9 +99,7 @@ def render_training_progress(payload: dict[str, object], status_box, progress_ba
 
     phase_progress = {
         "profiling": 0.08,
-        "shortlist": 0.30,
-        "champion": 0.58,
-        "tuning": 0.82,
+        "shortlist": 0.78,
         "finalizing": 0.94,
         "saving": 0.97,
         "done": 1.0,
@@ -99,11 +108,7 @@ def render_training_progress(payload: dict[str, object], status_box, progress_ba
 
     if current is not None and total:
         if phase == "shortlist":
-            progress_value = 0.10 + (current / total) * 0.42
-        elif phase == "champion":
-            progress_value = 0.58 + (current / total) * 0.20
-        elif phase == "tuning":
-            progress_value = 0.82 + (current / total) * 0.10
+            progress_value = 0.10 + (current / total) * 0.72
 
     progress_bar.progress(min(max(progress_value, 0.0), 1.0))
 
@@ -275,10 +280,8 @@ def render_model_results(results_df: pd.DataFrame) -> None:
         return
 
     shortlist_df = chart_df[chart_df["stage"] == "shortlist"].copy()
-    champion_df = chart_df[chart_df["stage"] == "champion"].copy()
-    tuning_df = chart_df[chart_df["stage"] == "tuning"].copy()
 
-    st.subheader("Stage 1: Recommended Shortlist")
+    st.subheader("Model Benchmark Results")
     if shortlist_df.empty:
         st.info("No shortlist-stage results available.")
     else:
@@ -301,54 +304,6 @@ def render_model_results(results_df: pd.DataFrame) -> None:
         shortlist_fig.update_traces(texttemplate="%{text:.4f}", textposition="outside")
         shortlist_fig.update_layout(yaxis_title="CV Score", xaxis_title="Model")
         st.plotly_chart(shortlist_fig, use_container_width=True)
-
-    st.subheader("Stage 2: Champion Round")
-    if champion_df.empty:
-        st.info("No champion-stage results available.")
-    else:
-        st.dataframe(
-            champion_df[["stage", "model", "cv_score", "test_score", "best"]].sort_values("cv_score", ascending=False),
-            use_container_width=True,
-        )
-        champion_fig = px.bar(
-            champion_df.sort_values("cv_score", ascending=False),
-            x="model",
-            y="cv_score",
-            color="label",
-            text="cv_score",
-            title="Champion Round CV Scores",
-            color_discrete_map={
-                "Best Model": "#1f77b4",
-                "Other Models": "#bfc7d5",
-            },
-        )
-        champion_fig.update_traces(texttemplate="%{text:.4f}", textposition="outside")
-        champion_fig.update_layout(yaxis_title="CV Score", xaxis_title="Model")
-        st.plotly_chart(champion_fig, use_container_width=True)
-
-    st.subheader("Stage 3: Hyperparameter Tuning")
-    if tuning_df.empty:
-        st.info("No tuning-stage results available.")
-    else:
-        st.dataframe(
-            tuning_df[["stage", "model", "cv_score", "test_score", "best"]].sort_values("cv_score", ascending=False),
-            use_container_width=True,
-        )
-        tuning_fig = px.bar(
-            tuning_df.sort_values("cv_score", ascending=False),
-            x="model",
-            y="cv_score",
-            color="label",
-            text="cv_score",
-            title="Tuning Round CV Scores",
-            color_discrete_map={
-                "Best Model": "#1f77b4",
-                "Other Models": "#bfc7d5",
-            },
-        )
-        tuning_fig.update_traces(texttemplate="%{text:.4f}", textposition="outside")
-        tuning_fig.update_layout(yaxis_title="CV Score", xaxis_title="Model")
-        st.plotly_chart(tuning_fig, use_container_width=True)
 
 
 def render_evaluation_panel(evaluation_artifacts: dict[str, object]) -> None:
@@ -940,7 +895,28 @@ def main() -> None:
     else:
         default_target_index = max(len(dataset.columns) - 1, 0)
 
-    selected_target = st.selectbox("Target column", options=dataset.columns.tolist(), index=default_target_index)
+    target_col, task_col, mode_col = st.columns(3)
+    with target_col:
+        selected_target = st.selectbox("Target column", options=dataset.columns.tolist(), index=default_target_index)
+    with task_col:
+        task_type_choice = st.selectbox(
+            "Task type",
+            options=["Auto Detect", "Classification", "Regression"],
+            index=0,
+        )
+    with mode_col:
+        training_mode = st.selectbox(
+            "Training mode",
+            options=["Fast", "Balanced", "Full"],
+            index=1,
+        )
+
+    task_type_override = None
+    if task_type_choice == "Classification":
+        task_type_override = "classification"
+    elif task_type_choice == "Regression":
+        task_type_override = "regression"
+
     dataset_features = dataset.drop(columns=[selected_target])
     model_bundle = load_model()
     trained_model = None
@@ -978,6 +954,8 @@ def main() -> None:
             training_results_df, evaluation_artifacts = train_model(
                 dataset,
                 selected_target,
+                task_type_override=task_type_override,
+                training_mode=training_mode,
                 progress_callback=progress_callback,
             )
         st.success(f"Training complete. Model saved to `{MODEL_PATH.name}`.")
