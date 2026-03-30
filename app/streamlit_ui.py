@@ -2,6 +2,7 @@ from pathlib import Path
 
 import joblib
 import json
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -228,6 +229,8 @@ def render_model_results(results_df: pd.DataFrame) -> None:
         return
 
     chart_df = results_df.copy()
+    metric_name = str(chart_df["metric_name"].iloc[0]) if "metric_name" in chart_df.columns and not chart_df.empty else "Score"
+    ascending = metric_name.upper() == "RMSE"
     chart_df["is_best"] = chart_df["best"].astype(str).str.len() > 0
     chart_df["label"] = chart_df["is_best"].map({True: "Best Model", False: "Other Models"})
 
@@ -250,19 +253,19 @@ def render_model_results(results_df: pd.DataFrame) -> None:
         st.subheader("Model Performance")
         st.dataframe(results_df, use_container_width=True)
         fig = px.bar(
-            chart_df,
+            chart_df.sort_values("cv_score", ascending=ascending),
             x="model",
             y="cv_score",
             color="label",
             text="cv_score",
-            title="Cross-Validation Score by Model",
+            title=f"Cross-Validation {metric_name} by Model",
             color_discrete_map={
                 "Best Model": "#1f77b4",
                 "Other Models": "#bfc7d5",
             },
         )
         fig.update_traces(texttemplate="%{text:.4f}", textposition="outside")
-        fig.update_layout(yaxis_title="CV Score", xaxis_title="Model")
+        fig.update_layout(yaxis_title=metric_name, xaxis_title="Model")
         st.plotly_chart(fig, use_container_width=True)
         return
 
@@ -273,23 +276,23 @@ def render_model_results(results_df: pd.DataFrame) -> None:
         st.info("No shortlist-stage results available.")
     else:
         st.dataframe(
-            shortlist_df[["stage", "model", "cv_score", "test_score", "best"]].sort_values("cv_score", ascending=False),
+            shortlist_df[["stage", "model", "cv_score", "test_score", "best"]].sort_values("cv_score", ascending=ascending),
             use_container_width=True,
         )
         shortlist_fig = px.bar(
-            shortlist_df.sort_values("cv_score", ascending=False),
+            shortlist_df.sort_values("cv_score", ascending=ascending),
             x="model",
             y="cv_score",
             color="label",
             text="cv_score",
-            title="Shortlist Round CV Scores",
+            title=f"Shortlist Round {metric_name}",
             color_discrete_map={
                 "Best Model": "#1f77b4",
                 "Other Models": "#bfc7d5",
             },
         )
         shortlist_fig.update_traces(texttemplate="%{text:.4f}", textposition="outside")
-        shortlist_fig.update_layout(yaxis_title="CV Score", xaxis_title="Model")
+        shortlist_fig.update_layout(yaxis_title=metric_name, xaxis_title="Model")
         st.plotly_chart(shortlist_fig, use_container_width=True)
 
 
@@ -483,7 +486,9 @@ def build_shap_summary(model: object, x_test: pd.DataFrame) -> pd.DataFrame | No
 
 def render_explainability_panel(evaluation_artifacts: dict[str, object]) -> None:
     best_model_name = evaluation_artifacts.get("best_model_name", "Best Model")
-    shap_summary = build_shap_summary(evaluation_artifacts.get("model"), evaluation_artifacts.get("x_test"))
+    shap_summary = evaluation_artifacts.get("shap_summary")
+    if shap_summary is None:
+        shap_summary = build_shap_summary(evaluation_artifacts.get("model"), evaluation_artifacts.get("x_test"))
 
     if shap_summary is None or shap_summary.empty:
         st.info("Advanced SHAP explainability is available when the `shap` package is installed and supported by the selected best model.")
@@ -817,8 +822,8 @@ def main() -> None:
             <div class="hero-kicker">Smart Model Discovery</div>
             <h1 class="hero-title">Auto<span class="gradient">ML Playground</span></h1>
             <p class="hero-subtitle">
-                Upload a dataset or pick one from the registry, then let the pipeline shortlist,
-                challenge, and surface the best-fit model for your data.
+                Upload a dataset or pick one from the registry, then let the production AutoML
+                pipeline preprocess, tune, compare, and explain the best-fit model for your data.
             </p>
             <div class="hero-line"></div>
         </section>
@@ -838,7 +843,7 @@ def main() -> None:
         """
         <section class="control-shell">
             <div class="control-title">Model Setup</div>
-            <div class="control-subtitle">Choose a dataset source, select the target column, and launch training.</div>
+            <div class="control-subtitle">Choose a dataset source, configure the task, and launch end-to-end AutoML training.</div>
         </section>
         """,
         unsafe_allow_html=True,

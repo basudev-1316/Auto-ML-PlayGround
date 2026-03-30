@@ -1,0 +1,6 @@
+feature,mean_abs_shap
+num__experience,3885.100481476746
+num__age^2,1241.8996325331277
+num__age,593.5126054209734
+num__age num__experience,231.5584188637988
+num__experience^2,183.08917587634818

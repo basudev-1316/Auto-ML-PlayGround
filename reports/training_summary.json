@@ -1,0 +1,18 @@
+{
+  "best_model_name": "LinearRegression",
+  "task_type": "regression",
+  "metric_name": "RMSE",
+  "cv_score": 3929.9546282748024,
+  "test_metrics": {
+    "r2": 0.8406273342143367,
+    "mae": 1257.7645077218322,
+    "rmse": 1400.0341175136411
+  },
+  "recommended_models": [
+    "LinearRegression",
+    "RandomForestRegressor"
+  ],
+  "row_count": 20,
+  "column_count": 2,
+  "training_mode": "Full"
+}

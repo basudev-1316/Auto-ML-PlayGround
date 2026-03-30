@@ -10,6 +10,7 @@ from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
 
 
 def prepare_dataframe(df: pd.DataFrame, target: str) -> pd.DataFrame:
+    """Validate the dataset and expand supported raw columns before training."""
     prepared_df = df.copy()
     if target not in prepared_df.columns:
         raise ValueError(f"Target column '{target}' was not found in the dataset.")
@@ -25,6 +26,7 @@ def prepare_dataframe(df: pd.DataFrame, target: str) -> pd.DataFrame:
 
 
 def detect_task_type(y: pd.Series, task_type_override: str | None = None) -> str:
+    """Infer whether the target represents a classification or regression task."""
     unique_values = y.nunique(dropna=True)
     if unique_values < 2:
         raise ValueError(
@@ -54,6 +56,7 @@ def detect_task_type(y: pd.Series, task_type_override: str | None = None) -> str
 
 
 def build_preprocessor(x: pd.DataFrame) -> ColumnTransformer:
+    """Build a ColumnTransformer for numeric and categorical preprocessing."""
     numeric_features = x.select_dtypes(include=["int64", "float64", "int32", "float32"]).columns.tolist()
     categorical_features = x.select_dtypes(exclude=["number"]).columns.tolist()
 
@@ -80,6 +83,7 @@ def build_preprocessor(x: pd.DataFrame) -> ColumnTransformer:
 
 
 def split_dataset(df: pd.DataFrame, target: str, task_type: str):
+    """Split the dataset into train and test partitions with safe stratification."""
     x = df.drop(columns=[target])
     y = df[target]
     stratify = y if task_type == "classification" else None
@@ -87,6 +91,7 @@ def split_dataset(df: pd.DataFrame, target: str, task_type: str):
 
 
 def encode_target(y: pd.Series, task_type: str) -> tuple[pd.Series, LabelEncoder | None]:
+    """Encode classification targets while leaving regression targets unchanged."""
     if task_type != "classification":
         return y, None
 
@@ -100,6 +105,7 @@ def decode_target_values(
     task_type: str,
     target_encoder: LabelEncoder | None,
 ) -> pd.Series | np.ndarray:
+    """Decode encoded class labels back to their original representation."""
     if task_type != "classification" or target_encoder is None:
         return values
 
