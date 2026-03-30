@@ -1,111 +1,127 @@
 # AutoML Playground
 
 ## Overview
-AutoML Playground is a Streamlit-based AutoML app for tabular datasets. You can upload a CSV or select a registered benchmark dataset, choose a target column, and let the app:
+AutoML Playground is a Python-based machine learning project that trains multiple models on tabular datasets, compares them, and selects the best fit automatically through a Streamlit interface.
 
-- detect regression vs classification
-- profile the dataset
-- shortlist suitable models
-- run a champion round with sub-model variants
-- run lightweight hyperparameter tuning
-- select and save the best model
-
-The UI also includes:
-
-- automated EDA
-- training progress feedback
-- evaluation charts
-- feature importance
-- optional SHAP explainability
+The system supports:
+- regression and classification datasets
+- automatic preprocessing
+- multiple model benchmarking
+- cross-validation based model comparison
+- explainability and evaluation charts
+- local and cloud deployment
 
 ## Project Structure
 ```text
-automl-project/
-├── app.py
-├── streamlit_app.py
-├── main.py
-├── src/
-│   └── automl_pipeline.py
+automl-playground/
+├── app/
+│   ├── __init__.py
+│   └── streamlit_ui.py
 ├── config/
 │   └── dataset_registry.json
 ├── data/
 │   └── data.csv
 ├── models/
-│   └── best_model.pkl
+│   └── .gitkeep
+├── notebooks/
+│   └── Untitled5.ipynb
+├── reports/
+│   └── .gitkeep
+├── src/
+│   ├── __init__.py
+│   ├── automl_pipeline.py
+│   ├── data_preprocessing.py
+│   ├── evaluate.py
+│   ├── model_selection.py
+│   └── train.py
+├── app.py
+├── main.py
+├── streamlit_app.py
 ├── requirements.txt
-├── Procfile
-├── runtime.txt
 └── README.md
 ```
 
-## How Training Works
-The pipeline runs in three stages:
+## Architecture
+The project is split into focused machine learning modules:
 
-1. Stage 1: shortlist models recommended from the dataset profile
-2. Stage 2: champion round with tuned sub-model variants
-3. Stage 3: lightweight hyperparameter tuning on the strongest candidates
+- `src/data_preprocessing.py`
+  handles data cleaning, task detection, encoding, splitting, and preprocessing pipelines
+- `src/model_selection.py`
+  defines the candidate model pool and dataset-driven shortlist recommendation logic
+- `src/evaluate.py`
+  computes ML metrics and extracts feature importance
+- `src/train.py`
+  provides the training service used by the CLI and the Streamlit app
+- `src/automl_pipeline.py`
+  orchestrates the AutoML training flow from profiling to best-model selection
+- `app/streamlit_ui.py`
+  contains the Streamlit frontend
 
-For larger datasets, the app now uses a faster path:
+## ML Workflow
+1. Load a dataset from the registry or upload a CSV
+2. Select the target column
+3. Detect or override the task type
+4. Build preprocessing steps using `sklearn.Pipeline`
+5. Recommend models based on dataset profile
+6. Benchmark the shortlisted models with cross-validation
+7. Select the best model directly from Stage 1
+8. Save the model bundle to `models/best_model.pkl`
+9. Display metrics, charts, and explainability in the UI
 
-- reduced benchmark shortlist
-- fewer CV folds
-- lighter default ensemble sizes
-- smaller tuning rounds
-- sampling for very large datasets
+## Models Used
+### Classification
+- LogisticRegression
+- RandomForestClassifier
+- ExtraTreesClassifier
+- GradientBoostingClassifier
+- HistGradientBoostingClassifier
+- SVM
+- KNeighborsClassifier
+- XGBoostClassifier
+- LightGBMClassifier
+- CatBoostClassifier
 
-## Dataset Registry
-Registered datasets are defined in:
+### Regression
+- Ridge
+- ElasticNet
+- RandomForestRegressor
+- ExtraTreesRegressor
+- GradientBoostingRegressor
+- HistGradientBoostingRegressor
+- SVR
+- KNeighborsRegressor
+- XGBoostRegressor
+- LightGBMRegressor
+- CatBoostRegressor
 
-```text
-config/dataset_registry.json
-```
+## Tech Stack
+- Python
+- Streamlit
+- pandas
+- numpy
+- scikit-learn
+- XGBoost
+- LightGBM
+- CatBoost
+- Plotly
+- SHAP
+- joblib
 
-Each entry stores:
-
-- dataset name
-- file path
-- task type
-- default target column
-- cleanup instructions
-- benchmark role
-
-## Local Run
-Install dependencies:
-
+## Run Locally
 ```bash
 pip install -r requirements.txt
-```
-
-Start the app:
-
-```bash
 streamlit run app.py
 ```
 
-Or with the project venv:
-
+## CLI Training
 ```bash
-.venv/bin/streamlit run app.py
+python main.py
 ```
 
 ## Deployment
-The project includes deployment files for platforms that support a `Procfile` workflow.
-
-Files added for deployment:
-
-- `Procfile`
-- `runtime.txt`
-- `.gitignore`
-
-Start command:
-
-```text
-streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
-```
-
-This setup is suitable for platforms such as Render, Railway, and similar services.
+The project is prepared for deployment with Streamlit Community Cloud and other similar platforms.
 
 ## Notes
-- `shap` is optional for advanced explainability, but listed in `requirements.txt`
-- the saved model is written to `models/best_model.pkl`
-- `streamlit_app.py` is a simple wrapper around `app.py`
+- `app.py` is the root entrypoint used for deployment compatibility
+- the actual Streamlit implementation lives in `app/streamlit_ui.py`
+- the notebook is kept in `notebooks/` as the original experimentation version

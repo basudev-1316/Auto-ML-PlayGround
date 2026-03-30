@@ -6,52 +6,21 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import (
-    ExtraTreesClassifier,
-    ExtraTreesRegressor,
-    GradientBoostingClassifier,
-    GradientBoostingRegressor,
-    HistGradientBoostingClassifier,
-    HistGradientBoostingRegressor,
-    RandomForestClassifier,
-    RandomForestRegressor,
-)
-from sklearn.impute import SimpleImputer
-from sklearn.linear_model import ElasticNet, LogisticRegression, Ridge
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    mean_absolute_error,
-    mean_squared_error,
-    precision_score,
-    r2_score,
-    recall_score,
-    roc_auc_score,
-)
-from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.metrics import accuracy_score, r2_score
+from sklearn.model_selection import cross_val_score
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.preprocessing import LabelEncoder
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
-from sklearn.svm import SVC, SVR
 
-try:
-    from xgboost import XGBClassifier, XGBRegressor
-except Exception:
-    XGBClassifier = None
-    XGBRegressor = None
-
-try:
-    from lightgbm import LGBMClassifier, LGBMRegressor
-except Exception:
-    LGBMClassifier = None
-    LGBMRegressor = None
-
-try:
-    from catboost import CatBoostClassifier, CatBoostRegressor
-except Exception:
-    CatBoostClassifier = None
-    CatBoostRegressor = None
+from src.data_preprocessing import (
+    build_preprocessor as build_feature_preprocessor,
+    decode_target_values,
+    detect_task_type,
+    encode_target,
+    prepare_dataframe,
+    split_dataset,
+)
+from src.evaluate import build_test_metrics as build_metrics, extract_feature_importance
+from src.model_selection import build_model_registry, recommend_model_names
 
 
 @dataclass
@@ -109,6 +78,7 @@ class AutoMLPipeline:
         self.dataset_profile: DatasetProfile | None = None
         self.first_round_results: list[dict[str, object]] = []
         self.dataset_signature: dict[str, object] | None = None
+        self.model_errors: list[str] = []
 
     def report_progress(self, phase: str, message: str, current: int | None = None, total: int | None = None) -> None:
         if self.progress_callback is None:
@@ -123,50 +93,10 @@ class AutoMLPipeline:
         )
 
     def prepare_data(self) -> pd.DataFrame:
-        df = self.df.copy()
-        if self.target not in df.columns:
-            raise ValueError(f"Target column '{self.target}' was not found in the dataset.")
-
-        if "date" in df.columns:
-            parsed_dates = pd.to_datetime(df["date"], errors="coerce")
-            df["sale_year"] = parsed_dates.dt.year
-            df["sale_month"] = parsed_dates.dt.month
-            df["sale_day"] = parsed_dates.dt.day
-            df = df.drop(columns=["date"])
-
-        return df
+        return prepare_dataframe(self.df, self.target)
 
     def detect_task(self, y: pd.Series) -> None:
-        unique_values = y.nunique(dropna=True)
-        if unique_values < 2:
-            raise ValueError(
-                f"Target column '{self.target}' must have at least 2 unique values to train a model. "
-                f"Found only {unique_values} unique value(s)."
-            )
-
-        if self.task_type_override in {"classification", "regression"}:
-            self.task_type = self.task_type_override
-            print(f"Detected Task: {self.task_type} (manual override)")
-            return
-
-        sample_size = max(len(y), 1)
-        unique_ratio = unique_values / sample_size
-        is_object_like = y.dtype == "object" or str(y.dtype).startswith("category") or str(y.dtype) == "bool"
-        numeric_target = pd.api.types.is_numeric_dtype(y)
-        non_null_target = pd.Series(y.dropna())
-        integer_like_target = bool(
-            numeric_target and not non_null_target.empty and np.allclose(non_null_target % 1, 0)
-        )
-
-        if is_object_like:
-            self.task_type = "classification"
-        elif unique_values <= 20 and unique_ratio <= 0.2:
-            self.task_type = "classification"
-        elif integer_like_target and unique_values <= 50 and unique_ratio <= 0.1:
-            self.task_type = "classification"
-        else:
-            self.task_type = "regression"
-
+        self.task_type = detect_task_type(y, self.task_type_override)
         print(f"Detected Task: {self.task_type}")
 
     def profile_dataset(self, df: pd.DataFrame) -> DatasetProfile:
@@ -184,7 +114,7 @@ class AutoMLPipeline:
             if categorical_features[column].nunique(dropna=True) > min(50, max(int(len(df) * 0.05), 10))
         ]
 
-        recommended_models = self.recommend_model_names(
+        recommended_models = recommend_model_names(
             row_count=len(df),
             column_count=features.shape[1],
             numeric_feature_count=numeric_features.shape[1],
@@ -192,6 +122,7 @@ class AutoMLPipeline:
             missing_ratio=missing_ratio,
             high_cardinality_columns=high_cardinality_columns,
             task_type=self.task_type,
+            shortlist_limit=self.get_shortlist_limit(),
         )
         reasoning = self.build_profile_reasoning(
             row_count=len(df),
@@ -222,66 +153,6 @@ class AutoMLPipeline:
             "row_count": int(len(df)),
         }
         return profile
-
-    def recommend_model_names(
-        self,
-        row_count: int,
-        column_count: int,
-        numeric_feature_count: int,
-        categorical_feature_count: int,
-        missing_ratio: float,
-        high_cardinality_columns: list[str],
-        task_type: str,
-    ) -> list[str]:
-        if task_type == "classification":
-            recommended = [
-                "LogisticRegression",
-                "RandomForestClassifier",
-                "ExtraTreesClassifier",
-                "HistGradientBoostingClassifier",
-            ]
-
-            if row_count <= 5000 and column_count <= 40:
-                recommended.extend(["SVM", "KNeighborsClassifier"])
-            if categorical_feature_count > 0:
-                recommended.append("CatBoostClassifier")
-            if row_count >= 2000:
-                recommended.extend(["LightGBMClassifier", "XGBoostClassifier"])
-            if missing_ratio > 0.02:
-                recommended.append("GradientBoostingClassifier")
-        else:
-            recommended = [
-                "Ridge",
-                "RandomForestRegressor",
-                "ExtraTreesRegressor",
-                "HistGradientBoostingRegressor",
-            ]
-
-            if row_count <= 5000 and column_count <= 40:
-                recommended.extend(["SVR", "KNeighborsRegressor", "ElasticNet"])
-            else:
-                recommended.append("ElasticNet")
-            if categorical_feature_count > 0:
-                recommended.append("CatBoostRegressor")
-            if row_count >= 2000:
-                recommended.extend(["LightGBMRegressor", "XGBoostRegressor"])
-            if missing_ratio > 0.02:
-                recommended.append("GradientBoostingRegressor")
-
-        if categorical_feature_count == 0 and numeric_feature_count >= 10:
-            if task_type == "classification":
-                recommended.append("GradientBoostingClassifier")
-            else:
-                recommended.append("GradientBoostingRegressor")
-
-        if high_cardinality_columns:
-            if task_type == "classification":
-                recommended.append("CatBoostClassifier")
-            else:
-                recommended.append("CatBoostRegressor")
-
-        deduped_recommendations = list(dict.fromkeys(recommended))
-        return deduped_recommendations[: self.get_shortlist_limit()]
 
     def build_profile_reasoning(
         self,
@@ -352,129 +223,23 @@ class AutoMLPipeline:
         return 8
 
     def split_data(self, df: pd.DataFrame):
-        x = df.drop(columns=[self.target])
-        y = df[self.target]
+        x, x_test, y, y_test = split_dataset(df, self.target, self.task_type or "regression")
         self.feature_columns = x.columns.tolist()
-        stratify = y if self.task_type == "classification" else None
-        return train_test_split(x, y, test_size=0.2, random_state=42, stratify=stratify)
+        return x, x_test, y, y_test
 
     def encode_target(self, y: pd.Series) -> pd.Series:
-        if self.task_type != "classification":
-            return y
-
-        self.target_encoder = LabelEncoder()
-        encoded_values = self.target_encoder.fit_transform(y)
-        return pd.Series(encoded_values, index=y.index, name=y.name)
+        encoded_target, encoder = encode_target(y, self.task_type or "regression")
+        self.target_encoder = encoder
+        return encoded_target
 
     def decode_target_values(self, values: pd.Series | np.ndarray) -> pd.Series | np.ndarray:
-        if self.task_type != "classification" or self.target_encoder is None:
-            return values
-
-        values_array = np.asarray(values)
-        decoded_values = self.target_encoder.inverse_transform(values_array.astype(int))
-        if isinstance(values, pd.Series):
-            return pd.Series(decoded_values, index=values.index, name=values.name)
-        return decoded_values
+        return decode_target_values(values, self.task_type or "regression", self.target_encoder)
 
     def build_preprocessor(self, x: pd.DataFrame) -> ColumnTransformer:
-        numeric_features = x.select_dtypes(include=["int64", "float64", "int32", "float32"]).columns.tolist()
-        categorical_features = x.select_dtypes(exclude=["number"]).columns.tolist()
-
-        numeric_pipeline = Pipeline(
-            [
-                ("imputer", SimpleImputer(strategy="median")),
-                ("scaler", StandardScaler()),
-            ]
-        )
-
-        categorical_pipeline = Pipeline(
-            [
-                ("imputer", SimpleImputer(strategy="most_frequent")),
-                ("encoder", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
-            ]
-        )
-
-        return ColumnTransformer(
-            [
-                ("num", numeric_pipeline, numeric_features),
-                ("cat", categorical_pipeline, categorical_features),
-            ]
-        )
+        return build_feature_preprocessor(x)
 
     def get_models(self) -> dict[str, object]:
-        models: dict[str, object]
-        if self.task_type == "classification":
-            models = {
-                "LogisticRegression": LogisticRegression(max_iter=1000),
-                "RandomForestClassifier": RandomForestClassifier(n_estimators=120, random_state=42),
-                "ExtraTreesClassifier": ExtraTreesClassifier(n_estimators=120, random_state=42),
-                "GradientBoostingClassifier": GradientBoostingClassifier(random_state=42),
-                "HistGradientBoostingClassifier": HistGradientBoostingClassifier(random_state=42),
-                "SVM": SVC(probability=True),
-                "KNeighborsClassifier": KNeighborsClassifier(),
-            }
-            if XGBClassifier is not None:
-                models["XGBoostClassifier"] = XGBClassifier(
-                    n_estimators=120,
-                    max_depth=6,
-                    learning_rate=0.05,
-                    subsample=0.9,
-                    colsample_bytree=0.9,
-                    random_state=42,
-                    eval_metric="logloss",
-                )
-            if LGBMClassifier is not None:
-                models["LightGBMClassifier"] = LGBMClassifier(
-                    n_estimators=120,
-                    learning_rate=0.05,
-                    random_state=42,
-                    verbose=-1,
-                )
-            if CatBoostClassifier is not None:
-                models["CatBoostClassifier"] = CatBoostClassifier(
-                    iterations=120,
-                    learning_rate=0.05,
-                    depth=6,
-                    random_seed=42,
-                    verbose=False,
-                )
-            self.available_model_names = list(models.keys())
-            return models
-
-        models = {
-            "Ridge": Ridge(),
-            "ElasticNet": ElasticNet(random_state=42),
-            "RandomForestRegressor": RandomForestRegressor(n_estimators=120, random_state=42, n_jobs=-1),
-            "ExtraTreesRegressor": ExtraTreesRegressor(n_estimators=120, random_state=42, n_jobs=-1),
-            "GradientBoostingRegressor": GradientBoostingRegressor(random_state=42),
-            "HistGradientBoostingRegressor": HistGradientBoostingRegressor(random_state=42),
-            "SVR": SVR(),
-            "KNeighborsRegressor": KNeighborsRegressor(),
-        }
-        if XGBRegressor is not None:
-            models["XGBoostRegressor"] = XGBRegressor(
-                n_estimators=120,
-                max_depth=6,
-                learning_rate=0.05,
-                subsample=0.9,
-                colsample_bytree=0.9,
-                random_state=42,
-            )
-        if LGBMRegressor is not None:
-            models["LightGBMRegressor"] = LGBMRegressor(
-                n_estimators=120,
-                learning_rate=0.05,
-                random_state=42,
-                verbose=-1,
-            )
-        if CatBoostRegressor is not None:
-            models["CatBoostRegressor"] = CatBoostRegressor(
-                iterations=120,
-                learning_rate=0.05,
-                depth=6,
-                random_seed=42,
-                verbose=False,
-            )
+        models = build_model_registry(self.task_type or "regression")
         self.available_model_names = list(models.keys())
         return models
 
@@ -507,7 +272,11 @@ class AutoMLPipeline:
                 max_cv = 4
         if self.task_type == "classification":
             min_class_count = int(y_train.value_counts().min())
+            if min_class_count < 2:
+                return 0
             return max(2, min(max_cv, min_class_count))
+        if len(y_train) < 2:
+            return 0
         return max(2, min(max_cv, len(y_train)))
 
     def get_scoring(self) -> str:
@@ -568,12 +337,22 @@ class AutoMLPipeline:
             )
             pipeline = self.build_pipeline(preprocessor, model)
             try:
-                scores = cross_val_score(pipeline, x_train, y_train, cv=cv_splits, scoring=scoring)
+                if cv_splits >= 2:
+                    try:
+                        scores = cross_val_score(pipeline, x_train, y_train, cv=cv_splits, scoring=scoring)
+                        avg_score = float(np.mean(scores))
+                    except Exception:
+                        avg_score = None
+                else:
+                    avg_score = None
+
                 pipeline.fit(x_train, y_train)
                 test_score = self.evaluate(pipeline, x_test, y_test)
-                avg_score = float(np.mean(scores))
+                if avg_score is None:
+                    avg_score = float(test_score)
             except Exception as exc:
                 print(f"Skipping {name}: {exc}")
+                self.model_errors.append(f"{name}: {exc}")
                 continue
 
             print(f"{name} | CV: {avg_score:.4f} | Test: {test_score:.4f}")
@@ -610,61 +389,10 @@ class AutoMLPipeline:
         predictions: np.ndarray,
         probabilities: np.ndarray | None = None,
     ) -> dict[str, float]:
-        if self.task_type == "classification":
-            metrics = {
-                "accuracy": float(accuracy_score(y_test, predictions)),
-                "precision": float(precision_score(y_test, predictions, average="weighted", zero_division=0)),
-                "recall": float(recall_score(y_test, predictions, average="weighted", zero_division=0)),
-                "f1": float(f1_score(y_test, predictions, average="weighted", zero_division=0)),
-            }
-            unique_classes = pd.Series(y_test).dropna().unique()
-            if len(unique_classes) == 2 and probabilities is not None:
-                try:
-                    if getattr(probabilities, "ndim", 1) == 2 and probabilities.shape[1] >= 2:
-                        positive_scores = probabilities[:, 1]
-                    else:
-                        positive_scores = probabilities
-                    metrics["roc_auc"] = float(roc_auc_score(y_test, positive_scores))
-                except Exception:
-                    pass
-            return metrics
-
-        rmse = float(np.sqrt(mean_squared_error(y_test, predictions)))
-        return {
-            "r2": float(r2_score(y_test, predictions)),
-            "mae": float(mean_absolute_error(y_test, predictions)),
-            "rmse": rmse,
-        }
+        return build_metrics(self.task_type or "regression", y_test, predictions, probabilities)
 
     def extract_feature_importance(self, pipeline: Pipeline) -> pd.DataFrame | None:
-        try:
-            preprocessor = pipeline.named_steps["preprocessor"]
-            model = pipeline.named_steps["model"]
-            feature_names = preprocessor.get_feature_names_out()
-        except Exception:
-            return None
-
-        importances: np.ndarray | None = None
-        if hasattr(model, "feature_importances_"):
-            importances = np.asarray(model.feature_importances_, dtype=float)
-        elif hasattr(model, "coef_"):
-            coefficients = np.asarray(model.coef_, dtype=float)
-            if coefficients.ndim > 1:
-                importances = np.mean(np.abs(coefficients), axis=0)
-            else:
-                importances = np.abs(coefficients)
-
-        if importances is None or len(importances) != len(feature_names):
-            return None
-
-        importance_df = pd.DataFrame(
-            {
-                "feature": feature_names,
-                "importance": importances,
-            }
-        )
-        importance_df = importance_df.sort_values("importance", ascending=False).head(20).reset_index(drop=True)
-        return importance_df
+        return extract_feature_importance(pipeline)
 
     def train(self) -> TrainingSummary:
         prepared_df = self.prepare_data()
@@ -689,6 +417,7 @@ class AutoMLPipeline:
 
         self.results = []
         self.first_round_results = []
+        self.model_errors = []
         self.best_score = -np.inf
         self.best_model = None
         self.best_model_name = None
@@ -718,7 +447,11 @@ class AutoMLPipeline:
             stage_name="shortlist",
         )
         if not self.first_round_results:
-            raise RuntimeError("No candidate models could be trained successfully on this dataset.")
+            error_summary = "\n".join(self.model_errors[:5])
+            raise RuntimeError(
+                "No candidate models could be trained successfully on this dataset."
+                + (f"\n\nModel errors:\n{error_summary}" if error_summary else "")
+            )
 
         if self.best_model is None or self.best_model_name is None:
             raise RuntimeError("No model was trained.")
