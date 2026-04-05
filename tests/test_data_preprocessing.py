@@ -1,38 +1,73 @@
-"""Unit tests for dataset preparation and task detection."""
+"""Tests for the reusable data preprocessing pipeline."""
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
-from src.data_preprocessing import detect_task_type, prepare_dataframe
+from src.data_preprocessing import (
+    build_full_preprocessing_workflow,
+    build_preprocessing_pipeline,
+    detect_feature_types,
+    fit_transform_features,
+    split_features_and_target,
+    transform_features,
+)
 
 
-def test_prepare_dataframe_expands_date_columns() -> None:
-    df = pd.DataFrame(
+def build_sample_training_frame() -> pd.DataFrame:
+    """Create a mixed-type training dataframe with missing values."""
+    return pd.DataFrame(
         {
-            "date": ["2024-01-15", "2024-02-20"],
-            "feature": [1, 2],
-            "target": [10.0, 12.0],
+            "age": [25.0, np.nan, 40.0, 31.0],
+            "income": [50_000.0, 62_000.0, np.nan, 71_000.0],
+            "city": ["Delhi", "Mumbai", None, "Delhi"],
+            "segment": ["A", "B", "A", None],
+            "target": [0, 1, 0, 1],
         }
     )
 
-    prepared = prepare_dataframe(df, "target")
 
-    assert "date" not in prepared.columns
-    assert {"sale_year", "sale_month", "sale_day"}.issubset(prepared.columns)
+def test_detect_feature_types_splits_numeric_and_categorical_columns() -> None:
+    features, _ = split_features_and_target(build_sample_training_frame(), "target")
 
+    schema = detect_feature_types(features)
 
-def test_detect_task_type_identifies_string_target_as_classification() -> None:
-    target = pd.Series(["yes", "no", "yes", "no"])
-
-    detected = detect_task_type(target)
-
-    assert detected == "classification"
+    assert schema.numeric_columns == ["age", "income"]
+    assert schema.categorical_columns == ["city", "segment"]
 
 
-def test_detect_task_type_identifies_continuous_target_as_regression() -> None:
-    target = pd.Series([101.2, 110.5, 120.1, 118.9, 140.4])
+def test_preprocessing_pipeline_imputes_and_encodes_without_missing_values() -> None:
+    features, _ = split_features_and_target(build_sample_training_frame(), "target")
+    pipeline = build_preprocessing_pipeline(features)
 
-    detected = detect_task_type(target)
+    transformed = fit_transform_features(pipeline, features)
 
-    assert detected == "regression"
+    assert transformed.shape[0] == len(features)
+    assert not np.isnan(transformed).any()
+
+
+def test_preprocessing_pipeline_handles_unseen_categories_safely() -> None:
+    training_features, _ = split_features_and_target(build_sample_training_frame(), "target")
+    pipeline = build_preprocessing_pipeline(training_features)
+    fit_transform_features(pipeline, training_features)
+
+    inference_features = pd.DataFrame(
+        {
+            "age": [29.0],
+            "income": [58_000.0],
+            "city": ["Chennai"],
+            "segment": ["C"],
+        }
+    )
+    transformed = transform_features(pipeline, inference_features)
+
+    assert transformed.shape[0] == 1
+
+
+def test_full_preprocessing_workflow_wraps_preprocessor() -> None:
+    features, _ = split_features_and_target(build_sample_training_frame(), "target")
+
+    workflow = build_full_preprocessing_workflow(features)
+
+    assert "preprocessor" in workflow.named_steps

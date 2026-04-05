@@ -1,116 +1,159 @@
-"""Model registry and dataset-driven model selection utilities."""
+"""Explainable model-selection utilities for AutoML candidate comparison."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
-from sklearn.linear_model import LinearRegression, LogisticRegression
-
-try:
-    from xgboost import XGBClassifier, XGBRegressor
-except Exception:  # pragma: no cover
-    XGBClassifier = None
-    XGBRegressor = None
-
-try:
-    from lightgbm import LGBMClassifier, LGBMRegressor
-except Exception:  # pragma: no cover
-    LGBMClassifier = None
-    LGBMRegressor = None
+from typing import Any
 
 
 @dataclass(frozen=True)
-class ModelSpec:
-    """Configuration describing one candidate model family."""
+class ModelCandidate:
+    """Metadata describing one model family available to the AutoML engine."""
 
     name: str
-    estimator: object
-    supports_tuning: bool = True
+    family: str
+    estimator: object | None = None
 
 
-def build_model_registry(task_type: str) -> dict[str, object]:
-    """Return the production AutoML model pool for the requested task type."""
-    if task_type == "classification":
-        models: dict[str, object] = {
-            "LogisticRegression": LogisticRegression(max_iter=2000),
-            "RandomForestClassifier": RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=-1),
-        }
-        if XGBClassifier is not None:
-            models["XGBoostClassifier"] = XGBClassifier(
-                n_estimators=200,
-                max_depth=6,
-                learning_rate=0.05,
-                subsample=0.9,
-                colsample_bytree=0.9,
-                random_state=42,
-                eval_metric="logloss",
-            )
-        if LGBMClassifier is not None:
-            models["LightGBMClassifier"] = LGBMClassifier(
-                n_estimators=200,
-                learning_rate=0.05,
-                random_state=42,
-                verbose=-1,
-            )
-        return models
-
-    models = {
-        "LinearRegression": LinearRegression(),
-        "RandomForestRegressor": RandomForestRegressor(n_estimators=200, random_state=42, n_jobs=-1),
-    }
-    if XGBRegressor is not None:
-        models["XGBoostRegressor"] = XGBRegressor(
-            n_estimators=200,
-            max_depth=6,
-            learning_rate=0.05,
-            subsample=0.9,
-            colsample_bytree=0.9,
-            random_state=42,
-        )
-    if LGBMRegressor is not None:
-        models["LightGBMRegressor"] = LGBMRegressor(
-            n_estimators=200,
-            learning_rate=0.05,
-            random_state=42,
-            verbose=-1,
-        )
-    return models
+SIMPLICITY_RANKING: dict[str, int] = {
+    "LogisticRegression": 1,
+    "LinearRegression": 1,
+    "NaiveBayes": 1,
+    "KNN": 2,
+    "KNNRegressor": 2,
+    "SVC": 3,
+    "SVR": 3,
+    "RandomForestClassifier": 4,
+    "RandomForestRegressor": 4,
+    "LightGBMClassifier": 5,
+    "LightGBMRegressor": 5,
+    "XGBoostClassifier": 6,
+    "XGBoostRegressor": 6,
+}
 
 
-def recommend_model_names(
-    *,
-    row_count: int,
-    column_count: int,
-    numeric_feature_count: int,
-    categorical_feature_count: int,
-    missing_ratio: float,
-    high_cardinality_columns: list[str],
-    task_type: str,
-    shortlist_limit: int,
-) -> list[str]:
-    """Recommend the most suitable model families for a dataset profile."""
-    if task_type == "classification":
-        recommended = [
+def build_model_registry(problem_type: str) -> dict[str, ModelCandidate]:
+    """Create a lightweight model registry for the requested problem type."""
+    if problem_type == "classification":
+        names = [
             "LogisticRegression",
             "RandomForestClassifier",
+            "XGBoostClassifier",
+            "LightGBMClassifier",
+            "SVC",
+            "KNN",
+            "NaiveBayes",
         ]
-        if categorical_feature_count > 0 or high_cardinality_columns:
-            recommended.append("LightGBMClassifier")
-        if row_count >= 2000 or numeric_feature_count >= 10:
-            recommended.append("XGBoostClassifier")
     else:
-        recommended = [
+        names = [
             "LinearRegression",
             "RandomForestRegressor",
+            "XGBoostRegressor",
+            "LightGBMRegressor",
+            "SVR",
+            "KNNRegressor",
         ]
-        if categorical_feature_count > 0 or high_cardinality_columns:
-            recommended.append("LightGBMRegressor")
-        if row_count >= 2000 or numeric_feature_count >= 10:
-            recommended.append("XGBoostRegressor")
 
-    if missing_ratio > 0.05:
-        preferred = "LightGBMClassifier" if task_type == "classification" else "LightGBMRegressor"
-        recommended.insert(0, preferred)
+    return {
+        model_name: ModelCandidate(
+            name=model_name,
+            family=model_name,
+            estimator=None,
+        )
+        for model_name in names
+    }
 
-    return list(dict.fromkeys(recommended))[:shortlist_limit]
+
+def _extract_metric(entry: dict[str, object], key: str) -> float:
+    """Return a numeric metric from a result entry, defaulting safely to zero."""
+    return float(entry.get(key, 0.0))
+
+
+def _get_simplicity_rank(model_name: str) -> int:
+    """Return the configured simplicity rank for a model family."""
+    return SIMPLICITY_RANKING.get(model_name, 999)
+
+
+def _get_score_direction(results: dict[str, dict[str, object]]) -> str:
+    """Infer whether higher or lower scores are better based on the metric label."""
+    if not results:
+        raise ValueError("Results dictionary cannot be empty.")
+
+    first_entry = next(iter(results.values()))
+    metric_name = str(first_entry.get("metric_name", "")).upper()
+    if "RMSE" in metric_name:
+        return "min"
+    return "max"
+
+
+def compare_model_scores(results: dict[str, dict[str, object]]) -> list[dict[str, object]]:
+    """Compare models after applying score, variance, and simplicity adjustments."""
+    if not results:
+        raise ValueError("Results dictionary cannot be empty.")
+
+    score_direction = _get_score_direction(results)
+    comparisons: list[dict[str, object]] = []
+
+    for model_name, metrics in results.items():
+        mean_score = _extract_metric(metrics, "mean_score")
+        std_score = _extract_metric(metrics, "std_score")
+        train_time = _extract_metric(metrics, "train_time")
+        simplicity_rank = _get_simplicity_rank(model_name)
+        adjusted_score = mean_score - std_score if score_direction == "max" else mean_score + std_score
+
+        comparisons.append(
+            {
+                "model_name": model_name,
+                "mean_score": mean_score,
+                "std_score": std_score,
+                "train_time": train_time,
+                "simplicity_rank": simplicity_rank,
+                "adjusted_score": adjusted_score,
+                "model_object": metrics.get("model_object"),
+            }
+        )
+
+    reverse = score_direction == "max"
+    return sorted(comparisons, key=lambda item: item["adjusted_score"], reverse=reverse)
+
+
+def select_best_model(results: dict[str, dict[str, object]]) -> tuple[str, Any, str]:
+    """Select the best model with explainable score, variance, and simplicity logic."""
+    ranked_models = compare_model_scores(results)
+    best_candidate = ranked_models[0]
+    runner_up = ranked_models[1] if len(ranked_models) > 1 else None
+    score_direction = _get_score_direction(results)
+
+    chosen = best_candidate
+    reasoning_parts = [
+        f"Started with the strongest adjusted score after penalizing variance: {best_candidate['model_name']}.",
+        f"Adjusted score = {best_candidate['adjusted_score']:.4f}, mean score = {best_candidate['mean_score']:.4f}, std = {best_candidate['std_score']:.4f}.",
+    ]
+
+    if runner_up is not None:
+        score_gap = abs(best_candidate["mean_score"] - runner_up["mean_score"])
+        reference_score = max(abs(best_candidate["mean_score"]), 1e-12)
+        gap_ratio = score_gap / reference_score
+
+        if gap_ratio < 0.01 and runner_up["simplicity_rank"] < best_candidate["simplicity_rank"]:
+            chosen = runner_up
+            reasoning_parts.append(
+                f"The score gap versus {runner_up['model_name']} is below 1%, so the simpler model was preferred."
+            )
+        else:
+            if score_direction == "max":
+                reasoning_parts.append(
+                    f"{best_candidate['model_name']} kept the lead after variance penalty over {runner_up['model_name']}."
+                )
+            else:
+                reasoning_parts.append(
+                    f"{best_candidate['model_name']} kept the lower penalized RMSE over {runner_up['model_name']}."
+                )
+
+    if chosen["simplicity_rank"] == best_candidate["simplicity_rank"]:
+        reasoning_parts.append(
+            f"Simplicity rank for the selected model is {chosen['simplicity_rank']}."
+        )
+
+    reasoning = " ".join(reasoning_parts)
+    return chosen["model_name"], chosen["model_object"], reasoning

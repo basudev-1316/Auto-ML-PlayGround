@@ -1,3 +1,7 @@
-stage,model,cv_score,test_score,best,metric_name
-shortlist,LinearRegression,3929.9546,1400.0341,This is the best fit model,RMSE
-shortlist,RandomForestRegressor,5830.044,4171.5014,,RMSE
+model_name,mean_score,std_score,train_time,metric_name,is_best,rank,highlight
+LinearRegression,7.889187982710342,1.3932283536658236,0.018826999999873806,RMSE,True,1,Best Model
+KNNRegressor,10.78889000231495,3.045628427426514,0.016379584000333125,RMSE,False,2,Other Models
+LightGBMRegressor,10.826934655910637,2.7552764755358448,0.06218100000023696,RMSE,False,3,Other Models
+RandomForestRegressor,11.24581353522105,3.449704759981508,0.6511639169998489,RMSE,False,4,Other Models
+SVR,11.45437595295421,3.7207236024407253,0.01631904099986059,RMSE,False,5,Other Models
+XGBoostRegressor,14.033046340942382,2.2038792348534564,1.1215080000001763,RMSE,False,6,Other Models

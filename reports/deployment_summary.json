@@ -1,0 +1,22 @@
+{
+  "problem_type": "regression",
+  "target_column": "age",
+  "best_model_name": "LinearRegression",
+  "best_score": 7.889187982710342,
+  "metric_name": "RMSE",
+  "reasoning": "Started with the strongest adjusted score after penalizing variance: LinearRegression. Adjusted score = 9.2824, mean score = 7.8892, std = 1.3932. LinearRegression kept the lower penalized RMSE over LightGBMRegressor. Simplicity rank for the selected model is 1.",
+  "reports": {
+    "comparison_csv": "/Users/basudev/Documents/Auto ML/automl-project/reports/model_comparison.csv",
+    "task_plot": "/Users/basudev/Documents/Auto ML/automl-project/reports/residual_plot.png",
+    "feature_importance": "/Users/basudev/Documents/Auto ML/automl-project/reports/feature_importance.png",
+    "shap_summary": "/Users/basudev/Documents/Auto ML/automl-project/reports/shap_summary.png"
+  },
+  "models": [
+    "LinearRegression",
+    "RandomForestRegressor",
+    "SVR",
+    "KNNRegressor",
+    "XGBoostRegressor",
+    "LightGBMRegressor"
+  ]
+}
