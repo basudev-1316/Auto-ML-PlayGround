@@ -19,6 +19,10 @@ from sklearn.metrics import (
     mean_squared_error,
     r2_score,
 )
+from src.logger import get_logger
+
+
+LOGGER = get_logger(__name__)
 
 
 def ensure_reports_dir(reports_dir: str | Path) -> Path:
@@ -36,18 +40,27 @@ def evaluate_model(
 ) -> dict[str, float]:
     """Compute task-appropriate evaluation metrics for a trained model."""
     predictions = model.predict(features)
+    LOGGER.info(
+        "Predictions generated for evaluation. problem_type=%s rows=%d",
+        problem_type,
+        len(pd.Series(target)),
+    )
 
     if problem_type == "classification":
-        return {
+        metrics = {
             "accuracy": float(accuracy_score(target, predictions)),
         }
+        LOGGER.info("Evaluation metrics: %s", metrics)
+        return metrics
 
     rmse = float(mean_squared_error(target, predictions) ** 0.5)
-    return {
+    metrics = {
         "r2": float(r2_score(target, predictions)),
         "mae": float(mean_absolute_error(target, predictions)),
         "rmse": rmse,
     }
+    LOGGER.info("Evaluation metrics: %s", metrics)
+    return metrics
 
 
 def build_model_comparison_dataframe(
@@ -112,6 +125,7 @@ def save_model_comparison_report(
     plt.tight_layout()
     plt.savefig(output_dir / "model_scores.png")
     plt.close()
+    LOGGER.info("Saved model comparison report to %s", csv_path)
 
     return csv_path
 
@@ -136,6 +150,7 @@ def save_confusion_matrix_report(
     output_path = output_dir / "confusion_matrix.png"
     plt.savefig(output_path)
     plt.close()
+    LOGGER.info("Saved confusion matrix report to %s", output_path)
     return output_path
 
 
@@ -167,4 +182,5 @@ def save_residual_plot_report(
     output_path = output_dir / "residual_plot.png"
     plt.savefig(output_path)
     plt.close()
+    LOGGER.info("Saved residual plot report to %s", output_path)
     return output_path

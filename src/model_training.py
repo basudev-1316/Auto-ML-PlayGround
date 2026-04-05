@@ -20,6 +20,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.svm import SVC, SVR
 
 from src.data_preprocessing import build_preprocessing_pipeline
+from src.logger import get_logger
 
 try:
     from xgboost import XGBClassifier, XGBRegressor
@@ -32,6 +33,9 @@ try:
 except Exception:  # pragma: no cover
     LGBMClassifier = None
     LGBMRegressor = None
+
+
+LOGGER = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -162,22 +166,27 @@ def train_model_candidate(
     cv_folds: int = 5,
 ) -> tuple[dict[str, float], Pipeline]:
     """Train and evaluate one candidate model family."""
+    LOGGER.info("Training started for model '%s' (%s).", model_name, problem_type)
     preprocessing_pipeline = build_preprocessing_pipeline(features)
     training_pipeline = build_training_pipeline(preprocessing_pipeline, estimator)
     scoring = get_scoring_name(problem_type)
     cv_strategy = build_cv_strategy(problem_type, target, cv_folds=cv_folds)
 
-    start_time = perf_counter()
-    cv_scores = cross_val_score(
-        training_pipeline,
-        features,
-        target,
-        cv=cv_strategy,
-        scoring=scoring,
-        n_jobs=1,
-    )
-    training_pipeline.fit(features, target)
-    train_time = perf_counter() - start_time
+    try:
+        start_time = perf_counter()
+        cv_scores = cross_val_score(
+            training_pipeline,
+            features,
+            target,
+            cv=cv_strategy,
+            scoring=scoring,
+            n_jobs=1,
+        )
+        training_pipeline.fit(features, target)
+        train_time = perf_counter() - start_time
+    except Exception:
+        LOGGER.exception("Training failed for model '%s'.", model_name)
+        raise
 
     if problem_type == "regression":
         cv_scores = -cv_scores
@@ -187,6 +196,13 @@ def train_model_candidate(
         "std_score": float(np.std(cv_scores)),
         "train_time": float(train_time),
     }
+    LOGGER.info(
+        "Model '%s' completed. mean_score=%.4f std_score=%.4f train_time=%.4fs",
+        model_name,
+        result["mean_score"],
+        result["std_score"],
+        result["train_time"],
+    )
     return result, training_pipeline
 
 
@@ -198,6 +214,7 @@ def train_all_models(
     cv_folds: int = 5,
 ) -> tuple[dict[str, dict[str, float]], dict[str, Pipeline]]:
     """Train every model in the registry and return metrics plus fitted pipelines."""
+    LOGGER.info("Training run started for problem type '%s' with %d rows.", problem_type, len(X))
     model_registry = build_model_registry(problem_type)
     training_target, _ = prepare_target_for_training(y, problem_type)
 
@@ -216,4 +233,5 @@ def train_all_models(
         results[model_name] = model_result
         trained_models[model_name] = trained_pipeline
 
+    LOGGER.info("Training run finished for problem type '%s'. %d models trained.", problem_type, len(results))
     return results, trained_models

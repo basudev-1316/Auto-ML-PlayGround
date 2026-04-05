@@ -5,6 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from src.logger import get_logger
+
+
+LOGGER = get_logger(__name__)
 
 @dataclass(frozen=True)
 class ModelCandidate:
@@ -156,4 +160,5 @@ def select_best_model(results: dict[str, dict[str, object]]) -> tuple[str, Any, 
         )
 
     reasoning = " ".join(reasoning_parts)
+    LOGGER.info("Best model selected: %s. %s", chosen["model_name"], reasoning)
     return chosen["model_name"], chosen["model_object"], reasoning

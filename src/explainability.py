@@ -16,11 +16,15 @@ import pandas as pd
 from sklearn.pipeline import Pipeline
 
 from src.evaluation import ensure_reports_dir
+from src.logger import get_logger
 
 try:
     import shap
 except Exception:  # pragma: no cover
     shap = None
+
+
+LOGGER = get_logger(__name__)
 
 
 TREE_MODEL_KEYWORDS = (
@@ -109,6 +113,7 @@ def build_shap_summary(model: Any, features: Any) -> ExplanationArtifacts:
         .sort_values("importance", ascending=False)
         .reset_index(drop=True)
     )
+    LOGGER.info("SHAP values generated for %d features.", len(feature_names))
 
     return ExplanationArtifacts(
         shap_values=raw_shap_values,
@@ -137,6 +142,7 @@ def save_feature_importance_report(
 
     explanation.feature_importance_path = output_path
     explanation.importance_frame.to_csv(output_dir / "feature_importance.csv", index=False)
+    LOGGER.info("Saved SHAP feature importance report to %s", output_path)
     return output_path
 
 
@@ -160,6 +166,7 @@ def save_shap_summary_report(explanation: ExplanationArtifacts, reports_dir: str
     plt.close()
 
     explanation.summary_plot_path = output_path
+    LOGGER.info("Saved SHAP summary report to %s", output_path)
     return output_path
 
 

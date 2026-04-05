@@ -5,6 +5,10 @@
   "best_score": 7.889187982710342,
   "metric_name": "RMSE",
   "reasoning": "Started with the strongest adjusted score after penalizing variance: LinearRegression. Adjusted score = 9.2824, mean score = 7.8892, std = 1.3932. LinearRegression kept the lower penalized RMSE over LightGBMRegressor. Simplicity rank for the selected model is 1.",
+  "saved_model_path": "/Users/basudev/Documents/Auto ML/automl-project/models/model_20260405_154802.pkl",
+  "saved_model_metadata_path": "/Users/basudev/Documents/Auto ML/automl-project/models/model_20260405_154802.json",
+  "experiments_path": "/Users/basudev/Documents/Auto ML/automl-project/experiments.csv",
+  "run_id": "run_47c194e003cd",
   "reports": {
     "comparison_csv": "/Users/basudev/Documents/Auto ML/automl-project/reports/model_comparison.csv",
     "task_plot": "/Users/basudev/Documents/Auto ML/automl-project/reports/residual_plot.png",

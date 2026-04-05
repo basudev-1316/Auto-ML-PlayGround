@@ -1,0 +1,6 @@
+Dataset,Model,Score
+Sample Purchase,NaiveBayes,0.6666666666666666
+Seattle Housing,RandomForestRegressor,746862.4009828018
+Iris,KNN,0.9733333333333333
+Breast Cancer,LogisticRegression,0.9754200315603825
+Diabetes,LinearRegression,55.435737418456675

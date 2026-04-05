@@ -1,10 +1,12 @@
-"""Phase 1 CLI scaffold for the AutoML project."""
+"""Command-line entrypoint helpers for AutoML Playground."""
 
 
 def main() -> None:
-    """Print the current project status for the phase-1 scaffold."""
-    print("AutoML Playground Phase 1 scaffold is ready.")
-    print("The production implementation will be added in later phases.")
+    """Print a quick status message for the production AutoML project."""
+    print("AutoML Playground is ready.")
+    print("Run the UI with: streamlit run app/streamlit_app.py")
+    print("Run the API with: uvicorn api.main:app --reload")
+    print("Run tests with: pytest tests")
 
 
 if __name__ == "__main__":

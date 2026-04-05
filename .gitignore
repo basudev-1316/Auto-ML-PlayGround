@@ -5,3 +5,8 @@ __pycache__/
 catboost_info/
 .streamlit/
 models/*.pkl
+models/*.json
+experiments.csv
+logs/*.log
+logs/*.json
+.pytest_cache/

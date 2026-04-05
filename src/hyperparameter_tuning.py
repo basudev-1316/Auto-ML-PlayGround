@@ -14,6 +14,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import accuracy_score, mean_squared_error
 
 from src.data_preprocessing import build_preprocessing_pipeline
+from src.logger import get_logger
 from src.model_training import (
     build_cv_strategy,
     build_model_registry,
@@ -21,8 +22,7 @@ from src.model_training import (
     prepare_target_for_training,
 )
 
-
-LOGGER = logging.getLogger(__name__)
+LOGGER = get_logger(__name__)
 
 
 @dataclass
@@ -135,6 +135,12 @@ def tune_model(
     cv_folds: int = 5,
 ) -> tuple[Any, dict[str, Any], float]:
     """Tune a supported model family and return the best fitted pipeline."""
+    LOGGER.info(
+        "Hyperparameter tuning started for model '%s' (%s) with %d trials.",
+        model_name,
+        problem_type,
+        n_trials,
+    )
     supported_registry = _build_supported_tuning_registry(problem_type)
     if model_name not in supported_registry:
         raise ValueError(
@@ -186,5 +192,10 @@ def tune_model(
         best_model=best_model,
         best_params=study.best_params,
         best_score=best_score,
+    )
+    LOGGER.info(
+        "Hyperparameter tuning completed for model '%s'. best_score=%.4f",
+        model_name,
+        best_score,
     )
     return tuning_result.best_model, tuning_result.best_params, tuning_result.best_score

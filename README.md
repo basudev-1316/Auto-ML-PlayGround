@@ -1,38 +1,72 @@
 # AutoML Playground
 
-AutoML Playground is a production-style AutoML system for tabular machine learning. It accepts CSV datasets, detects the ML problem type automatically, preprocesses features, trains multiple candidate models, tunes selected models with Optuna, selects the best model using explainable decision rules, generates evaluation reports, and provides a Streamlit UI for interactive use.
+AutoML Playground is a production-style AutoML system for tabular machine learning. It accepts CSV datasets, detects whether the problem is classification or regression, builds a preprocessing pipeline automatically, trains multiple candidate models, tunes top model families, selects the winner with explainable decision logic, generates reports, exposes a Streamlit UI, and includes a FastAPI inference service.
+
+## Project Overview
+
+This project is designed to turn a raw tabular dataset into a complete ML workflow with minimal manual setup.
+
+Core workflow:
+- upload a CSV dataset
+- choose the target column
+- detect the problem type automatically
+- preprocess numeric and categorical features
+- train multiple models
+- tune selected models with Optuna
+- select the best model with explainable rules
+- generate evaluation artifacts and SHAP explainability
+- save versioned models and tracking metadata
+- serve predictions through Streamlit or FastAPI
 
 ## Features
-- Upload a CSV dataset through a Streamlit app
-- Select the target column dynamically
-- Automatically detect:
-  - regression problems
-  - classification problems
-  - numeric features
-  - categorical features
-- Preprocess tabular data with:
-  - numeric imputation
-  - categorical imputation
+
+- Automatic problem detection for classification and regression
+- Reusable preprocessing pipeline with:
+  - missing-value imputation
   - one-hot encoding
-  - feature scaling
-- Train multiple models for classification and regression
-- Run Optuna-based hyperparameter tuning for top model families
-- Select the best model with:
+  - numeric feature scaling
+- Multi-model training for:
+  - classification
+  - regression
+- Optuna-based hyperparameter tuning for top model families
+- Explainable model selection using:
   - score comparison
   - variance penalty
   - simplicity preference when scores are close
-- Generate report artifacts:
-  - model comparison table
-  - model comparison chart
-  - confusion matrix
-  - residual plot
-  - SHAP feature importance
-  - SHAP summary plot
-- Save the trained best model for reuse
+- SHAP-based explainability reports
+- Versioned model saving with metadata
+- Lightweight monitoring and experiment tracking
+- Streamlit UI for interactive training
+- FastAPI service for inference
+- Benchmark runner for comparing performance across datasets
+- Docker support for containerized execution
+- Pytest test suite
+
+## Architecture Diagram
+
+```mermaid
+flowchart TD
+    A["CSV Dataset"] --> B["Problem Detection"]
+    B --> C["Preprocessing Pipeline"]
+    C --> D["Train Multiple Models"]
+    D --> E["Optuna Tuning"]
+    E --> F["Model Selection Engine"]
+    F --> G["Evaluation Reports"]
+    F --> H["SHAP Explainability"]
+    F --> I["Versioned Model Storage"]
+    I --> J["FastAPI /predict"]
+    F --> K["Streamlit UI"]
+    D --> L["Experiment Tracking"]
+    K --> M["Monitoring Metrics"]
+```
 
 ## Project Structure
+
 ```text
 automl-playground/
+├── api/
+│   ├── __init__.py
+│   └── main.py
 ├── app/
 │   ├── __init__.py
 │   └── streamlit_app.py
@@ -41,56 +75,36 @@ automl-playground/
 ├── data/
 │   ├── data.csv
 │   └── sample_dataset.csv
+├── logs/
+│   ├── app.log
+│   └── metrics.json
 ├── models/
-│   ├── .gitkeep
-│   └── best_model.pkl
 ├── notebooks/
 │   └── Untitled5.ipynb
 ├── reports/
 ├── src/
-│   ├── __init__.py
+│   ├── benchmarking.py
 │   ├── data_preprocessing.py
-│   ├── feature_engineering.py
-│   ├── problem_detection.py
-│   ├── model_training.py
-│   ├── hyperparameter_tuning.py
-│   ├── model_selection.py
 │   ├── evaluation.py
+│   ├── experiment_tracking.py
 │   ├── explainability.py
+│   ├── feature_engineering.py
+│   ├── hyperparameter_tuning.py
+│   ├── logger.py
+│   ├── model_selection.py
+│   ├── model_training.py
+│   ├── monitoring.py
+│   ├── problem_detection.py
 │   └── utils.py
 ├── tests/
-│   ├── test_data_preprocessing.py
-│   ├── test_evaluation.py
-│   ├── test_explainability.py
-│   ├── test_hyperparameter_tuning.py
-│   ├── test_model_selection.py
-│   ├── test_model_training.py
-│   ├── test_problem_detection.py
-│   └── test_project_structure.py
 ├── Dockerfile
 ├── Procfile
-├── app.py
-├── main.py
-├── requirements.txt
-├── runtime.txt
-└── streamlit_app.py
-```
-
-## System Architecture
-```mermaid
-flowchart TD
-    A["Upload CSV"] --> B["Select Target Column"]
-    B --> C["Problem Detection"]
-    C --> D["Preprocessing Pipeline"]
-    D --> E["Train Multiple Models"]
-    E --> F["Optuna Tuning for Top Models"]
-    F --> G["Model Selection Engine"]
-    G --> H["Evaluation + Reports"]
-    G --> I["SHAP Explainability"]
-    G --> J["Save Best Model"]
+├── README.md
+└── requirements.txt
 ```
 
 ## Models Used
+
 ### Classification
 - LogisticRegression
 - RandomForestClassifier
@@ -108,66 +122,162 @@ flowchart TD
 - SVR
 - KNNRegressor
 
-## Explainable Model Selection
-The best model is selected using a clear rule-based system:
-- highest model score is preferred
-- high standard deviation is penalized
-- if the score gap is below `1%`, the simpler model is preferred
+## Benchmark Results
 
-This produces an explainable reasoning string instead of a black-box winner selection.
+Latest benchmark summary from [/Users/basudev/Documents/Auto ML/automl-project/reports/results.csv](/Users/basudev/Documents/Auto%20ML/automl-project/reports/results.csv):
 
-## Report Artifacts
-Training generates artifacts inside [`reports/`](/Users/basudev/Documents/Auto%20ML/automl-project/reports):
-- `model_comparison.csv`
-- `model_scores.png`
-- `confusion_matrix.png` for classification tasks
-- `residual_plot.png` for regression tasks
-- `feature_importance.csv`
-- `feature_importance.png`
-- `shap_summary.png`
-- `deployment_summary.json`
+| Dataset | Model | Score |
+| --- | --- | ---: |
+| Sample Purchase | LogisticRegression | 1.0000 |
+| Seattle Housing | XGBoostRegressor | 370574.2323 |
+| Iris | KNN | 0.9733 |
+| Breast Cancer | LogisticRegression | 0.9737 |
+| Diabetes | LinearRegression | 54.8489 |
 
-The best trained model is saved to [`models/best_model.pkl`](/Users/basudev/Documents/Auto%20ML/automl-project/models/best_model.pkl).
+Benchmark comparison plot:
 
-## Installation
+![Benchmark comparison](/Users/basudev/Documents/Auto%20ML/automl-project/reports/benchmark_comparison.png)
+
+## Screenshots
+
+Training and explainability artifacts generated by the system:
+
+### Model Comparison
+![Model comparison](/Users/basudev/Documents/Auto%20ML/automl-project/reports/model_scores.png)
+
+### SHAP Summary
+![SHAP summary](/Users/basudev/Documents/Auto%20ML/automl-project/reports/shap_summary.png)
+
+### Feature Importance
+![Feature importance](/Users/basudev/Documents/Auto%20ML/automl-project/reports/feature_importance.png)
+
+## Generated Outputs
+
+The project writes the following outputs during training and benchmarking:
+
+- reports:
+  - [/Users/basudev/Documents/Auto ML/automl-project/reports/model_comparison.csv](/Users/basudev/Documents/Auto%20ML/automl-project/reports/model_comparison.csv)
+  - [/Users/basudev/Documents/Auto ML/automl-project/reports/model_scores.png](/Users/basudev/Documents/Auto%20ML/automl-project/reports/model_scores.png)
+  - [/Users/basudev/Documents/Auto ML/automl-project/reports/residual_plot.png](/Users/basudev/Documents/Auto%20ML/automl-project/reports/residual_plot.png)
+  - [/Users/basudev/Documents/Auto ML/automl-project/reports/feature_importance.png](/Users/basudev/Documents/Auto%20ML/automl-project/reports/feature_importance.png)
+  - [/Users/basudev/Documents/Auto ML/automl-project/reports/shap_summary.png](/Users/basudev/Documents/Auto%20ML/automl-project/reports/shap_summary.png)
+  - [/Users/basudev/Documents/Auto ML/automl-project/reports/results.csv](/Users/basudev/Documents/Auto%20ML/automl-project/reports/results.csv)
+  - classification runs also generate `confusion_matrix.png`
+- versioned models:
+  - saved in [/Users/basudev/Documents/Auto ML/automl-project/models](/Users/basudev/Documents/Auto%20ML/automl-project/models)
+- monitoring:
+  - [/Users/basudev/Documents/Auto ML/automl-project/logs/app.log](/Users/basudev/Documents/Auto%20ML/automl-project/logs/app.log)
+  - [/Users/basudev/Documents/Auto ML/automl-project/logs/metrics.json](/Users/basudev/Documents/Auto%20ML/automl-project/logs/metrics.json)
+- experiment tracking:
+  - [/Users/basudev/Documents/Auto ML/automl-project/experiments.csv](/Users/basudev/Documents/Auto%20ML/automl-project/experiments.csv)
+
+## Setup Instructions
+
+### 1. Clone and enter the project
+
 ```bash
 cd "/Users/basudev/Documents/Auto ML/automl-project"
+```
+
+### 2. Create a virtual environment
+
+```bash
 python3 -m venv .venv
+```
+
+### 3. Install dependencies
+
+```bash
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
 ## Run the Streamlit App
+
 ```bash
 cd "/Users/basudev/Documents/Auto ML/automl-project"
 .venv/bin/streamlit run app/streamlit_app.py
 ```
 
+## Run the FastAPI Service
+
+```bash
+cd "/Users/basudev/Documents/Auto ML/automl-project"
+.venv/bin/uvicorn api.main:app --reload
+```
+
+## API Usage
+
+### Health Check
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+Example response:
+
+```json
+{
+  "status": "ok",
+  "model_loaded": true,
+  "model_name": "LogisticRegression",
+  "problem_type": "classification",
+  "target_column": "buy"
+}
+```
+
+### Prediction
+
+```bash
+curl -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "records": [
+      {"age": 29, "income": 48000, "experience": 3},
+      {"age": 41, "income": 82000, "experience": 12}
+    ]
+  }'
+```
+
+Example response:
+
+```json
+{
+  "model_name": "LogisticRegression",
+  "predictions": ["no", "yes"],
+  "model_path": "/path/to/model_YYYYMMDD_HHMMSS.pkl"
+}
+```
+
+## Run Benchmarks
+
+```bash
+cd "/Users/basudev/Documents/Auto ML/automl-project"
+MPLBACKEND=Agg .venv/bin/python - <<'PY'
+from src.benchmarking import run_all_benchmarks
+run_all_benchmarks()
+PY
+```
+
 ## Run Tests
+
 ```bash
 cd "/Users/basudev/Documents/Auto ML/automl-project"
 MPLBACKEND=Agg .venv/bin/python -m pytest tests
 ```
 
-## Sample Dataset
-A sample dataset is included at [`data/sample_dataset.csv`](/Users/basudev/Documents/Auto%20ML/automl-project/data/sample_dataset.csv) so the project can be tested quickly without needing an external file first.
+## Docker
 
-## Deployment
-The project is prepared for deployment with Streamlit and container-based environments.
-
-### Streamlit
 ```bash
-streamlit run app/streamlit_app.py
-```
-
-### Docker
-```bash
+cd "/Users/basudev/Documents/Auto ML/automl-project"
 docker build -t automl-playground .
 docker run -p 8501:8501 automl-playground
 ```
 
 ## Tech Stack
+
 - Python
 - Streamlit
+- FastAPI
 - pandas
 - numpy
 - scikit-learn
@@ -180,20 +290,27 @@ docker run -p 8501:8501 automl-playground
 - Seaborn
 - joblib
 - pytest
+- Docker
+
+## Quality Signals
+
+- automated preprocessing
+- automatic problem detection
+- multi-model benchmarking
+- explainable model selection
+- Optuna tuning
+- SHAP explainability
+- versioned model storage
+- monitoring and experiment tracking
+- API inference layer
+- benchmark reporting
+- tested backend modules
 
 ## Testing Status
-The project currently includes automated tests for:
-- data preprocessing
-- problem detection
-- model training
-- hyperparameter tuning
-- model selection
-- evaluation/reporting
-- explainability
-- project structure
 
 Latest local verification:
-- `30 passed`
+- `39 passed`
 
 ## Resume Summary
-Built a production-style AutoML platform in Python and Streamlit that performs automated preprocessing, problem detection, multi-model training, Optuna-based tuning, explainable model selection, SHAP explainability, and report generation for tabular ML workflows.
+
+Built a production-style AutoML platform in Python with Streamlit and FastAPI that performs automated preprocessing, problem detection, multi-model training, hyperparameter tuning, explainable model selection, SHAP explainability, experiment tracking, monitoring, benchmarking, and API-based inference for tabular ML workflows.

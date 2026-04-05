@@ -2,6 +2,8 @@ pandas
 numpy
 scikit-learn
 joblib
+fastapi
+uvicorn
 optuna
 streamlit==1.55.0
 altair<6
